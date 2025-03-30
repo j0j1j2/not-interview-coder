@@ -9,13 +9,13 @@ document.addEventListener("mousedown", (e) => {
     dragging = true;
     startX = e.screenX;
     startY = e.screenY;
-    window.move.startDrag();
+    window.win.startDrag();
   }
 });
 
 document.addEventListener("mousemove", (e) => {
   if (dragging) {
-    window.move.dragWindow(e.screenX - startX, e.screenY - startY);
+    window.win.dragWindow(e.screenX - startX, e.screenY - startY);
     startX = e.screenX;
     startY = e.screenY;
   }
@@ -24,6 +24,6 @@ document.addEventListener("mousemove", (e) => {
 document.addEventListener("mouseup", () => {
   if (dragging) {
     dragging = false;
-    window.move.stopDrag();
+    window.win.stopDrag();
   }
 });

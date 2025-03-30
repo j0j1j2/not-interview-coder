@@ -1,10 +1,9 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, desktopCapturer, session } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, desktopCapturer } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
-import { activeWindow } from "get-windows";
-import fs from 'node:fs/promises';
-const DEVMODE =
-  process.env.NODE_ENV === "development" || process.argv.includes("--dev");
+import { registerWindow } from "./ipc/window";
+import { registerStore } from "./ipc/store";
+import { captureFocusedWindow, registerCapture } from "./ipc/capture";
 
 let mainWindow: BrowserWindow;
 let opacity = 1.0;
@@ -18,8 +17,11 @@ function createWindow() {
     width: 800,
     height: 600,
     frame: false,
-    opacity,
+    transparent: true,
+    opacity: opacity,
+    hasShadow: false,
     focusable: false,
+    alwaysOnTop: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -27,9 +29,13 @@ function createWindow() {
     },
   });
 
-  hideWindow();
+  app.dock.hide();
+  mainWindow.setContentProtection(true);
+  mainWindow.setIgnoreMouseEvents(false, { forward: true });
   registerShortCuts();
-  registerDragMove();
+  registerWindow(mainWindow);
+  registerStore(mainWindow);
+  registerCapture();
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -39,15 +45,13 @@ function createWindow() {
     );
   }
 
-  if (DEVMODE) {
-    mainWindow.webContents.openDevTools();
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    mainWindow.webContents.openDevTools({
+      mode: "detach",
+    });
   }
 }
 
-function hideWindow() {
-  app.dock.hide();
-  mainWindow.setContentProtection(true);
-}
 
 function registerShortCuts() {
   globalShortcut.register("CommandOrControl+]", () => {
@@ -69,51 +73,11 @@ function registerShortCuts() {
   });
 
   globalShortcut.register("CommandOrControl+P", async () => {
-    await captureFocusedWidnow();
+    await captureFocusedWindow();
   });
 }
 
-function registerDragMove() {
-  let windowBound: Electron.Rectangle;
 
-  ipcMain.on("start-drag", () => {
-    console.log("start-drag");
-    windowBound = mainWindow.getBounds();
-  });
-
-  ipcMain.on("drag-window", (event, { deltaX, deltaY }) => {
-    console.log("drag-window", { deltaX, deltaY });
-    if (windowBound) {
-      mainWindow.setBounds({
-        x: windowBound.x + deltaX,
-        y: windowBound.y + deltaY,
-        width: windowBound.width,
-        height: windowBound.height,
-      });
-    }
-    windowBound = mainWindow.getBounds();
-  });
-
-  ipcMain.on("stop-drag", () => {
-    console.log("stop-drag");
-    windowBound = mainWindow.getBounds();
-  });
-}
-
-async function captureFocusedWidnow() { 
-  try {
-    const activeInfo = await activeWindow();
-    const sources = await desktopCapturer.getSources({
-      types: ['window'],
-      thumbnailSize: { width: activeInfo.bounds.width, height: activeInfo.bounds.height }
-    }); 
-    const source = sources.filter(s => s.id.split(':').at(1) == activeInfo.id.toString()).at(0);
-    return source.thumbnail.toPNG();
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
-}
 
 // #region lifecycle
 app.on("ready", createWindow);
@@ -133,4 +97,5 @@ app.on("window-all-closed", () => {
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });
+
 // #endregion
