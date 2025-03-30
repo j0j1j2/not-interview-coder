@@ -1,7 +1,8 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, desktopCapturer, session } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
-
+import { activeWindow } from "get-windows";
+import fs from 'node:fs/promises';
 const DEVMODE =
   process.env.NODE_ENV === "development" || process.argv.includes("--dev");
 
@@ -66,6 +67,10 @@ function registerShortCuts() {
       mainWindow.show();
     }
   });
+
+  globalShortcut.register("CommandOrControl+P", async () => {
+    await captureFocusedWidnow();
+  });
 }
 
 function registerDragMove() {
@@ -93,6 +98,21 @@ function registerDragMove() {
     console.log("stop-drag");
     windowBound = mainWindow.getBounds();
   });
+}
+
+async function captureFocusedWidnow() { 
+  try {
+    const activeInfo = await activeWindow();
+    const sources = await desktopCapturer.getSources({
+      types: ['window'],
+      thumbnailSize: { width: activeInfo.bounds.width, height: activeInfo.bounds.height }
+    }); 
+    const source = sources.filter(s => s.id.split(':').at(1) == activeInfo.id.toString()).at(0);
+    return source.thumbnail.toPNG();
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
 }
 
 // #region lifecycle
