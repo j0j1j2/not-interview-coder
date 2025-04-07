@@ -1,4 +1,4 @@
-import './view/main'
+import './view/main.js'
 import "./index.css";
 
 let dragging = false;
